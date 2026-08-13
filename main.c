@@ -15,11 +15,10 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    // Pinta a tela de vermelho (R=255, G=0, B=0)
     al_clear_to_color(al_map_rgb(0, 255, 0));
-    al_flip_display(); // Atualiza o monitor com o que foi desenhado
+    al_flip_display(); 
 
-    al_rest(3.0); // Espera 3 segundos
+    al_rest(3.0); 
 
     al_destroy_display(display);
     return 0;
