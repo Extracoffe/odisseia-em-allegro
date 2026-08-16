@@ -1,0 +1,22 @@
+# Compilados e Binários
+*.exe
+*.o
+*.obj
+*.out
+*.dll
+*.a
+*.so
+*.dylib
+
+# Pastas de Build
+build/
+bin/
+obj/
+
+# Arquivos temporários do Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Configurações locais do VS Code (se não quiserem forçar as mesmas configurações de máquina)
+# Descomente a linha abaixo se quiser ignorar a pasta .vscode:
+# .vscode/
