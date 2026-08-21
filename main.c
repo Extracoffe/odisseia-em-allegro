@@ -32,9 +32,15 @@ int main() {
     int game_state = 0; //0 = menu, 1 = jogo, 2 = game over
     float x = 300.0;
     float y = 200.0;
+    int up = 0;
+    int down = 0;
+    int left = 0;
+    int right = 0;
 
     float size = 50.0; // Tamanho do retângulo.
     float speed = 10.0; // Velocidade de movimento do retângulo.
+
+    float margin = 10.0; // Margem para evitar que o retângulo saia da tela.
 
     while (true){
         ALLEGRO_EVENT event;
@@ -51,25 +57,65 @@ int main() {
             else if (game_state == 1) {
                 switch (event.keyboard.keycode) {
                     case ALLEGRO_KEY_W:
-                        y -= speed;
+                        up = 1;
                         break;
                     case ALLEGRO_KEY_S:
-                        y += speed;
+                        down = 1;
                         break;
                     case ALLEGRO_KEY_A:
-                        x -= speed;
+                        left = 1;
                         break;
                     case ALLEGRO_KEY_D:
-                        x += speed;
+                        right = 1;
                         break;
                 }
             }
         }
-        al_clear_to_color(al_map_rgb(255, 255, 255));
-        if(game_state == 0) {
-            al_draw_text(font, al_map_rgb(0, 0, 0), 230, 200, 0, "Isso realmente será uma Odisséia.");
-        } else if (game_state == 1) {
-            al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(255, 0, 0), 3.0); // Desenha um retângulo vermelho
+
+        if (event.type == ALLEGRO_EVENT_KEY_UP) {
+            switch (event.keyboard.keycode) {
+                case ALLEGRO_KEY_W:
+                    up = 0;
+                    break;
+                case ALLEGRO_KEY_S:
+                    down = 0;
+                    break;
+                case ALLEGRO_KEY_A:
+                    left = 0;
+                    break;
+                case ALLEGRO_KEY_D:
+                    right = 0;
+                    break;
+            }
+        }
+        
+        if (event.type == ALLEGRO_EVENT_TIMER) {
+            // Atualiza a tela apenas quando o timer dispara
+            al_clear_to_color(al_map_rgb(255, 255, 255));
+            if(game_state == 0) {
+                al_draw_text(font, al_map_rgb(0, 0, 0), 230, 200, 0, "Isso realmente será uma Odisséia.");
+            } else if (game_state == 1) {
+                if (up) y -= speed;
+                if (down) y += speed;
+                if (left) x -= speed;
+                if (right) x += speed;
+                al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(0, 0, 255), 3.0); // Desenha um retângulo azul
+            }
+            
+            al_flip_display();
+        }
+
+        if (x < margin ){
+            x = margin;
+        }
+        if(x + size > 640 - margin){
+            x = 640 - size - margin;
+        }
+        if (y < margin) {
+            y = margin;
+        }
+        if (y + size > 480 - margin) {
+            y = 480 - size - margin;
         }
         
         al_flip_display();
