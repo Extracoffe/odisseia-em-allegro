@@ -6,9 +6,9 @@
       "type": "shell",
       "command": "gcc",
       "args": [
-        "${file}",
+        "${fileDirname}\\*.c",
         "-o",
-        "${fileDirname}\\${fileBasenameNoExtension}.exe",
+        "${fileDirname}\\main.exe",
         "-lallegro_main",
         "-lallegro",
         "-lallegro_font",
