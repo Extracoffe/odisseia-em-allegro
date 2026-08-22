@@ -46,6 +46,14 @@ int main() {
     int attack_timer = 0; // Quanto tempo o ataque dura (em frames).
     int attack_direction = 1; // Direção do ataque: 0 = nenhum, 1 = cima, 2 = baixo, 3 = esquerda, 4 = direita.
 
+    int enemy_hp = 3; // Vida do inimigo.
+    int enemy_alive = 1; // Estado do inimigo: 1 = vivo, 0 = morto.
+    int enemy_size = 30; // Tamanho do inimigo.
+
+    float enemy_x = 400.0; // Posição x do inimigo.
+    float enemy_y = 200.0; // Posição y do inimigo.
+    float enemy_speed = 1.0; // Velocidade do inimigo.
+
     while (true){
         ALLEGRO_EVENT event;
         al_wait_for_event(event_queue, &event);
@@ -119,7 +127,51 @@ int main() {
                         is_attacking = 0;
                     }
                 }
+
+                if (enemy_alive == 1) {
+                    if (x > enemy_x) {
+                        enemy_x += enemy_speed;
+                    } else if (x < enemy_x) {
+                        enemy_x -= enemy_speed;
+                    }
+                    if (y > enemy_y) {
+                        enemy_y += enemy_speed;
+                    } else if (y < enemy_y) {
+                        enemy_y -= enemy_speed;
+                    }
+
+                    if (is_attacking == 1 && enemy_alive == 1) {
+                        if (attack_direction == 1 && y - 15 < enemy_y + enemy_size && y > enemy_y && x + size > enemy_x && x < enemy_x + enemy_size) {
+                            enemy_hp--;
+                            enemy_y -= 40; // Empurra o inimigo para cima
+                        }
+                        else if (attack_direction == 2 && y + size + 15 > enemy_y && y + size < enemy_y + enemy_size && x + size > enemy_x && x < enemy_x + enemy_size) {
+                            enemy_hp--;
+                            enemy_y += 40; // Empurra o inimigo para baixo
+                        }
+                        else if (attack_direction == 3 && x - 15 < enemy_x + enemy_size && x > enemy_x && y + size > enemy_y && y < enemy_y + enemy_size) {
+                            enemy_hp--;
+                            enemy_x -= 40; // Empurra o inimigo para a esquerda
+                        }
+                        else if (attack_direction == 4 && x + size + 15 > enemy_x && x + size < enemy_x + enemy_size && y + size > enemy_y && y < enemy_y + enemy_size) {
+                            enemy_hp--;
+                            enemy_x += 40; // Empurra o inimigo para a direita
+                        }
+
+                        if (enemy_hp <= 0) {
+                            enemy_alive = 0; // Inimigo morre
+                        }
+                    }
+
+                }
+
+
                 al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(0, 0, 255), 3.0); // Desenha um retângulo azul
+
+                if (enemy_alive == 1) {
+                    al_draw_rectangle(enemy_x, enemy_y, enemy_x + enemy_size, enemy_y + enemy_size, al_map_rgb(0, 255, 0), 3.0); // Desenha o inimigo verde
+                    al_draw_rectangle(enemy_x, enemy_y - 8, enemy_x + (enemy_hp * 10), enemy_y - 4, al_map_rgb(255, 0, 0), 2.0); // Desenha a barra de vida do inimigo
+                }
 
                 if (is_attacking == 1) {
                     if (attack_direction == 1) {
@@ -133,10 +185,8 @@ int main() {
                     }
                     else if (attack_direction == 4) {
                         al_draw_rectangle(x + size, y, x + size + 15, y + size, al_map_rgb(255, 0, 0), 3.0);
-                }
-                }
-                
-                
+                    }   
+                }               
             }
             
             al_flip_display();
