@@ -42,6 +42,10 @@ int main() {
 
     float margin = 10.0; // Margem para evitar que o retângulo saia da tela.
 
+    int is_attacking = 0; // Variável para controlar o estado de ataque.
+    int attack_timer = 0; // Quanto tempo o ataque dura (em frames).
+    int attack_direction = 1; // Direção do ataque: 0 = nenhum, 1 = cima, 2 = baixo, 3 = esquerda, 4 = direita.
+
     while (true){
         ALLEGRO_EVENT event;
         al_wait_for_event(event_queue, &event);
@@ -68,6 +72,12 @@ int main() {
                     case ALLEGRO_KEY_D:
                         right = 1;
                         break;
+                    case ALLEGRO_KEY_SPACE:
+                        if (!is_attacking) {
+                        is_attacking = 1; // Inicia o ataque.
+                        attack_timer = 10; // Define a duração do ataque.
+                        } 
+                        break; 
                 }
             }
         }
@@ -95,11 +105,38 @@ int main() {
             if(game_state == 0) {
                 al_draw_text(font, al_map_rgb(0, 0, 0), 230, 200, 0, "Isso realmente será uma Odisséia.");
             } else if (game_state == 1) {
-                if (up) y -= speed;
-                if (down) y += speed;
-                if (left) x -= speed;
-                if (right) x += speed;
+                if (up) { y -= speed;
+                   attack_direction = 1; }
+                if (down) { y += speed;
+                   attack_direction = 2; }
+                if (left) { x -= speed;
+                   attack_direction = 3; }
+                if (right) { x += speed;
+                   attack_direction = 4; }
+                if (is_attacking == 1){
+                    attack_timer--;
+                    if (attack_timer <= 0) {
+                        is_attacking = 0;
+                    }
+                }
                 al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(0, 0, 255), 3.0); // Desenha um retângulo azul
+
+                if (is_attacking == 1) {
+                    if (attack_direction == 1) {
+                        al_draw_rectangle(x, y - 15, x + size, y, al_map_rgb(255, 0, 0), 3.0);
+                    }
+                    else if (attack_direction == 2) {
+                        al_draw_rectangle(x, y + size, x + size, y + size + 15, al_map_rgb(255, 0, 0), 3.0);
+                    }
+                    else if (attack_direction == 3) {
+                        al_draw_rectangle(x - 15, y, x, y + size, al_map_rgb(255, 0, 0), 3.0);
+                    }
+                    else if (attack_direction == 4) {
+                        al_draw_rectangle(x + size, y, x + size + 15, y + size, al_map_rgb(255, 0, 0), 3.0);
+                }
+                }
+                
+                
             }
             
             al_flip_display();
