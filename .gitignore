@@ -20,3 +20,12 @@ Thumbs.db
 # Configurações locais do VS Code (se não quiserem forçar as mesmas configurações de máquina)
 # Descomente a linha abaixo se quiser ignorar a pasta .vscode:
 # .vscode/
+.vs/
+packages/
+x64/
+Debug/
+Release/
+*.db
+*.db-shm
+*.db-wal
+*.opendb
