@@ -130,20 +130,25 @@ int main() {
             al_flip_display();
         }
 
-        if (x < margin ){
-            x = margin;
+        int limiteJogador(); {
+            //limite esquerda
+            if (player.x < 0) {
+                player.x = 0;
+            }
+            //limite direita
+            if (player.x + player.size > 640) {
+                player.x = 640 - player.size;
+            }
+            //limite cima
+            if (player.y < 0) {
+                player.y = 0;
+            }
+            //limite baixo
+            if (player.y + player.size > 480) {
+                player.y = 480 - player.size;
+            }
         }
-        if(x + size > 640 - margin){
-            x = 640 - size - margin;
-        }
-        if (y < margin) {
-            y = margin;
-        }
-        if (y + size > 480 - margin) {
-            y = 480 - size - margin;
-        }
-        
-        al_flip_display();
+       
     }
 
     al_destroy_font(font);
