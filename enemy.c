@@ -1,6 +1,6 @@
 #include "enemy.h"
 
-void init_enemy(Enemy *e) {
+void init_enemy(Enemy* e) {
     e->x = 400;
     e->y = 200;
     e->size = 30;
@@ -9,15 +9,42 @@ void init_enemy(Enemy *e) {
     e->alive = 1;
 }
 
-void update_enemy(Enemy *e, Player *p) {
+void update_enemy(Enemy* e, Player* p) {
     if (e->alive == 0) return;
 
-    // Perseguição
-    if (p->x > e->x) e->x += e->speed;
-    else if (p->x < e->x) e->x -= e->speed;
+	// Perseguição e Colisão com o Player
 
-    if (p->y > e->y) e->y += e->speed;
-    else if (p->y < e->y) e->y -= e->speed;
+    // Movimento no Eixo X
+    if (p->x > e->x) {
+        e->x += e->speed;
+        // Se colidir indo para a direita, gruda na esquerda do player
+        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
+            e->x = p->x - e->size;
+        }
+    }
+    else if (p->x < e->x) {
+        e->x -= e->speed;
+        // Se colidir indo para a esquerda, gruda na direita do player
+        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
+            e->x = p->x + p->size;
+        }
+    }
+
+    // Movimento no Eixo Y
+    if (p->y > e->y) {
+        e->y += e->speed;
+        // Se colidir indo para baixo, gruda no topo do player
+        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
+            e->y = p->y - e->size;
+        }
+    }
+    else if (p->y < e->y) {
+        e->y -= e->speed;
+        // Se colidir indo para cima, gruda na base do player
+        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
+            e->y = p->y + p->size;
+        }
+    }
 
     // Colisão do ataque do Player no Inimigo
     if (p->is_attacking == 1) {

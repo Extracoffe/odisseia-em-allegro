@@ -148,6 +148,14 @@ int main() {
                 player.y = 480 - player.size;
             }
         }
+        
+        
+        int colisao(); {
+            if (enemy.x < player.x) {
+                enemy.x += enemy.speed;
+
+            }
+        }
        
     }
 
