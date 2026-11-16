@@ -60,7 +60,18 @@ int main() {
     Enemy enemy;
 
     init_player(&player);
-    init_enemy(&enemy);
+
+    #define TOTAL_INIMIGOS 3
+    Enemy inimigos[TOTAL_INIMIGOS];
+
+    for (int i = 0; i < TOTAL_INIMIGOS; i++) {
+        int tipo = rand() % 2;
+        init_enemy(&inimigos[i], tipo);
+
+        inimigos[i].x += (i * 250);
+    }
+
+    //init_enemy(&enemy);
 
     while (true){
         ALLEGRO_EVENT event;
@@ -129,34 +140,6 @@ int main() {
             
             al_flip_display();
         }
-
-        int limiteJogador(); {
-            //limite esquerda
-            if (player.x < 0) {
-                player.x = 0;
-            }
-            //limite direita
-            if (player.x + player.size > 640) {
-                player.x = 640 - player.size;
-            }
-            //limite cima
-            if (player.y < 0) {
-                player.y = 0;
-            }
-            //limite baixo
-            if (player.y + player.size > 480) {
-                player.y = 480 - player.size;
-            }
-        }
-        
-        
-        int colisao(); {
-            if (enemy.x < player.x) {
-                enemy.x += enemy.speed;
-
-            }
-        }
-       
     }
 
     al_destroy_font(font);
