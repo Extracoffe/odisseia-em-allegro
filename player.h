@@ -8,9 +8,9 @@ typedef struct {
     float x, y;
     int size;
     float speed;
-    int attack_direction;
+    /*int attack_direction;
     int is_attacking;
-    int attack_timer;
+    int attack_timer;*/
 } Player;
 
 void init_player(Player *p);

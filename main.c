@@ -1,143 +1,184 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
-#include <allegro5/allegro_audio.h>
-#include <allegro5/allegro_acodec.h>
-#include <allegro5/allegro_image.h>
-#include <allegro5/allegro_primitives.h> //Para testar com formas geometricas.
+#include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_ttf.h>
 #include "player.h"
 #include "enemy.h"
 
+#define TOTAL_OBSTACULOS 5
+#define TOTAL_INIMIGOS 5
+#define TOTAL_ENTIDADES (TOTAL_OBSTACULOS + TOTAL_INIMIGOS) // 10 no total
+
+void reiniciar_jogo(Player* player, Enemy entidades[], int* tempo_restante, ALLEGRO_TIMER* fase_timer) {
+    init_player(player);
+    *tempo_restante = 15;
+
+    // Os 5 primeiros índices (0 a 4) são Obstáculos Estáticos (Amarelos)
+    for (int i = 0; i < TOTAL_OBSTACULOS; i++) {
+        init_enemy(&entidades[i], 0);
+    }
+
+    // Os 5 últimos índices (5 a 9) são Inimigos em Ondas (Vermelhos)
+    for (int i = TOTAL_OBSTACULOS; i < TOTAL_ENTIDADES; i++) {
+        init_enemy(&entidades[i], 1);
+        // Espalha os inimigos na horizontal para não virem todos empilhados
+        entidades[i].x = 800.0 + ((i - TOTAL_OBSTACULOS) * 180.0);
+    }
+
+    al_start_timer(fase_timer);
+}
+
 int main() {
-    //Iniciar o allegro e a fonte dele.
-    al_init();
-    al_install_keyboard();
-    al_init_font_addon();
-    al_init_ttf_addon();
-    al_init_primitives_addon(); //Inicia o addon de primitivas.
+    if (!al_init()) return -1;
+    if (!al_install_keyboard()) return -1;
+    if (!al_init_font_addon()) return -1;
+    if (!al_init_ttf_addon()) return -1;
+    if (!al_init_primitives_addon()) return -1;
 
-    //Para renderizar a janela com suas dimensões, e abaixo, onde ela vai aparecer na tela.
-    ALLEGRO_DISPLAY * display = al_create_display(640, 480);
-    ALLEGRO_EVENT_QUEUE *event_queue = al_create_event_queue();
-    al_set_window_position(display, 200, 200);
+    srand((unsigned int)time(NULL));
 
-    //Fonte embutida do proprio allegro e em seguida, resumidamente, um fps.
-    ALLEGRO_FONT * font = al_create_builtin_font();
-    ALLEGRO_TIMER * timer = al_create_timer(1.0 / 60.0);
+    const int LARGURA_TELA = 800;
+    const int ALTURA_TELA = 600;
 
-    //Para conseguir fechar a janela clicando no x.
+    ALLEGRO_DISPLAY* display = al_create_display(LARGURA_TELA, ALTURA_TELA);
+    if (!display) return -1;
+
+    ALLEGRO_EVENT_QUEUE* event_queue = al_create_event_queue();
+    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
+    ALLEGRO_TIMER* fase_timer = al_create_timer(1.0);
+    ALLEGRO_FONT* font = al_create_builtin_font();
+
+    if (!event_queue || !timer || !fase_timer || !font) return -1;
+
+    al_set_window_position(display, 150, 100);
+
     al_register_event_source(event_queue, al_get_display_event_source(display));
     al_register_event_source(event_queue, al_get_keyboard_event_source());
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
+    al_register_event_source(event_queue, al_get_timer_event_source(fase_timer));
+
     al_start_timer(timer);
 
-    int game_state = 0; //0 = menu, 1 = jogo, 2 = game over
-    float x = 300.0;
-    float y = 200.0;
-    int up = 0;
-    int down = 0;
-    int left = 0;
-    int right = 0;
-
-    float size = 50.0; // Tamanho do retângulo.
-    float speed = 10.0; // Velocidade de movimento do retângulo.
-
-    float margin = 10.0; // Margem para evitar que o retângulo saia da tela.
-
-    int is_attacking = 0; // Variável para controlar o estado de ataque.
-    int attack_timer = 0; // Quanto tempo o ataque dura (em frames).
-    int attack_direction = 1; // Direção do ataque: 0 = nenhum, 1 = cima, 2 = baixo, 3 = esquerda, 4 = direita.
-
-    int enemy_hp = 3; // Vida do inimigo.
-    int enemy_alive = 1; // Estado do inimigo: 1 = vivo, 0 = morto.
-    int enemy_size = 30; // Tamanho do inimigo.
-
-    float enemy_x = 400.0; // Posição x do inimigo.
-    float enemy_y = 200.0; // Posição y do inimigo.
-    float enemy_speed = 1.0; // Velocidade do inimigo.
+    // 0 = Menu, 1 = Jogando, 2 = Vitória, 3 = Game Over
+    int game_state = 0;
+    int up = 0, down = 0, left = 0, right = 0;
+    int tempo_restante = 15;
 
     Player player;
-    Enemy enemy;
+    Enemy entidades[TOTAL_ENTIDADES];
 
-    init_player(&player);
-
-    #define TOTAL_INIMIGOS 3
-    Enemy inimigos[TOTAL_INIMIGOS];
-
-    for (int i = 0; i < TOTAL_INIMIGOS; i++) {
-        int tipo = rand() % 2;
-        init_enemy(&inimigos[i], tipo);
-
-        inimigos[i].x += (i * 250);
-    }
-
-    //init_enemy(&enemy);
-
-    while (true){
+    bool rodando = true;
+    while (rodando) {
         ALLEGRO_EVENT event;
         al_wait_for_event(event_queue, &event);
-        if( event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
-            break;
+
+        if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+            rodando = false;
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
             if (game_state == 0) {
-                game_state = 1; // Muda para o estado do jogo.
+                if (event.keyboard.keycode == ALLEGRO_KEY_SPACE || event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    reiniciar_jogo(&player, entidades, &tempo_restante, fase_timer);
+                    game_state = 1;
+                }
             }
-
             else if (game_state == 1) {
                 switch (event.keyboard.keycode) {
-                    case ALLEGRO_KEY_W:
-                        up = 1;
-                        break;
-                    case ALLEGRO_KEY_S:
-                        down = 1;
-                        break;
-                    case ALLEGRO_KEY_A:
-                        left = 1;
-                        break;
-                    case ALLEGRO_KEY_D:
-                        right = 1;
-                        break;
-                    case ALLEGRO_KEY_SPACE:
-                        if (player.is_attacking == 0) {
-                            player.is_attacking = 1;
-                            player.attack_timer = 10;
-                        }
-                        break;
+                case ALLEGRO_KEY_W:
+                case ALLEGRO_KEY_UP:
+                    up = 1; break;
+                case ALLEGRO_KEY_S:
+                case ALLEGRO_KEY_DOWN:
+                    down = 1; break;
+                case ALLEGRO_KEY_A:
+                case ALLEGRO_KEY_LEFT:
+                    left = 1; break;
+                case ALLEGRO_KEY_D:
+                case ALLEGRO_KEY_RIGHT:
+                    right = 1; break;
+                }
+            }
+            else if (game_state == 2 || game_state == 3) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_R) {
+                    reiniciar_jogo(&player, entidades, &tempo_restante, fase_timer);
+                    game_state = 1;
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_M) {
+                    al_stop_timer(fase_timer);
+                    game_state = 0;
                 }
             }
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_UP) {
             switch (event.keyboard.keycode) {
-                case ALLEGRO_KEY_W:
-                    up = 0;
-                    break;
-                case ALLEGRO_KEY_S:
-                    down = 0;
-                    break;
-                case ALLEGRO_KEY_A:
-                    left = 0;
-                    break;
-                case ALLEGRO_KEY_D:
-                    right = 0;
-                    break;
+            case ALLEGRO_KEY_W:
+            case ALLEGRO_KEY_UP:
+                up = 0; break;
+            case ALLEGRO_KEY_S:
+            case ALLEGRO_KEY_DOWN:
+                down = 0; break;
+            case ALLEGRO_KEY_A:
+            case ALLEGRO_KEY_LEFT:
+                left = 0; break;
+            case ALLEGRO_KEY_D:
+            case ALLEGRO_KEY_RIGHT:
+                right = 0; break;
             }
         }
-        
-        if (event.type == ALLEGRO_EVENT_TIMER) {
-            // Atualiza a tela apenas quando o timer dispara
-            al_clear_to_color(al_map_rgb(255, 255, 255));
-            if(game_state == 0) {
-                al_draw_text(font, al_map_rgb(0, 0, 0), 230, 200, 0, "Isso realmente será uma Odisséia.");
-            } else if (game_state == 1) {
-                update_player(&player, up, down, left, right);
-                update_enemy(&enemy, &player);
-                draw_player(player);
-                draw_enemy(enemy);   
+
+        // Contagem regressiva da fase (15s)
+        if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == fase_timer) {
+            if (game_state == 1) {
+                tempo_restante--;
+                if (tempo_restante <= 0) {
+                    al_stop_timer(fase_timer);
+                    game_state = 2; // Vitória
+                }
             }
-            
+        }
+
+        // Atualização e desenho (60 FPS)
+        if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == timer) {
+            al_clear_to_color(al_map_rgb(20, 25, 35));
+
+            if (game_state == 0) {
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 220, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 270, ALLEGRO_ALIGN_CENTER, "Desvie dos obstaculos (amarelos) e monstros (vermelhos) por 15s!");
+                al_draw_text(font, al_map_rgb(100, 255, 100), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Jogar");
+            }
+            else if (game_state == 1) {
+                update_player(&player, up, down, left, right);
+
+                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
+                    update_enemy(&entidades[i]);
+
+                    if (check_collision(player, entidades[i])) {
+                        al_stop_timer(fase_timer);
+                        game_state = 3; // Game Over
+                    }
+                }
+
+                draw_player(player);
+                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
+                    draw_enemy(entidades[i]);
+                }
+
+                al_draw_textf(font, al_map_rgb(255, 255, 255), 20, 20, 0, "Tempo: %ds", tempo_restante);
+            }
+            else if (game_state == 2) {
+                al_draw_text(font, al_map_rgb(0, 255, 0), LARGURA_TELA / 2, 240, ALLEGRO_ALIGN_CENTER, "PARABENS! VOCE SOBREVIVEU A FASE!");
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 300, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Reiniciar ou 'M' para o Menu");
+            }
+            else if (game_state == 3) {
+                al_draw_text(font, al_map_rgb(255, 60, 60), LARGURA_TELA / 2, 240, ALLEGRO_ALIGN_CENTER, "GAME OVER - O navio colidiu!");
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 300, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Tentar Novamente ou 'M' para o Menu");
+            }
+
             al_flip_display();
         }
     }
@@ -145,7 +186,8 @@ int main() {
     al_destroy_font(font);
     al_destroy_display(display);
     al_destroy_event_queue(event_queue);
+    al_destroy_timer(timer);
+    al_destroy_timer(fase_timer);
 
     return 0;
-    
 }

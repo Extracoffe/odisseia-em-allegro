@@ -1,137 +1,66 @@
+#include <stdlib.h>
+#include <math.h>
+#include <allegro5/allegro_primitives.h>
 #include "enemy.h"
 
 void init_enemy(Enemy* e, int tipo) {
-	// Inicializa o inimigo com valores padrão
-    e->x = 400;
-    e->y = 200;
-    e->size = 30;
-    e->speed = 2.0;
-    e->hp = 3;
-    e->tipo = tipo; 
-    e->angulo_onda = 0.0;
-    e->alive = 1;
+    e->tipo = tipo;
+    e->size = 35.0;
+    e->angulo_onda = (float)(rand() % 628) / 100.0; // Ângulo inicial aleatório para variar as ondas
 
-    // Se for obstáculo
-	if (tipo == 0) { 
-		e->y = 100 + (rand() % 400); //altura aleatória para obstáculo
-		e->size = 25; //tamanho do obstáculo
+    if (e->tipo == 0) {
+        // OBSTÁCULO ESTÁTICO (Amarelo): Nasce dentro da área jogável (longe da posição inicial do player)
+        e->x = 220.0 + (rand() % 520);
+        e->y = 40.0 + (rand() % 500);
+        e->base_y = e->y;
+        e->speed = 0.0;
     }
     else {
-		// Se for inimigo
-		e->y = 120 + (rand() % 360); //altura aleatória para inimigo
-		e->size = 20; //tamanho do inimigo
+        // INIMIGO EM ONDAS (Vermelho): Nasce fora da tela à direita e atravessa fazendo ondas
+        e->x = 800.0 + (rand() % 400);
+        e->base_y = 80.0 + (rand() % 440);
+        e->y = e->base_y;
+        e->speed = 3.5 + (rand() % 20) / 10.0; // Velocidade entre 3.5 e 5.5
     }
-
 }
 
-void update_enemy(Enemy* e, Player* p) {
-    if (e->alive == 0) return;
-
-	// Movimento do inimigo/obstáculo
-    if(e->tipo == 0){
-		//obstáculo se move da direita para a esquerda
-		e->x -= e->speed;
-
-		// Se o obstáculo sair da tela, reposiciona ele do lado direito com uma altura aleatória
-		if (e->x < -50) {
-			e->x = 800 + 50;
-			e->y = 100 + (rand() % 400);
-		}
-    }
-    else {
-        //inimigo move para esquerda fazendo ondas com o seno
-		e->x -= (e->speed + 1.0); 
-		e->angulo_onda += 0.08;
-		e->y = e->y_base + sin(e->angulo_onda) * 50.0; //onda vertical
-
-        if(e->x < -50) {
-            e->x = 800 +100;
-            e->y = 120 + (rand() % 360);
-			e->y_base = e->y; // Atualiza a posição base para a nova altura 
-        }
-    }
-
-	/* Perseguição e Colisão com o Player
-    // Movimento no Eixo X
-    if (p->x > e->x) {
-        e->x += e->speed;
-        // Se colidir indo para a direita, gruda na esquerda do player
-        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
-            e->x = p->x - e->size;
-        }
-    }
-    else if (p->x < e->x) {
+void update_enemy(Enemy* e) {
+    // Apenas o inimigo tipo 1 se move
+    if (e->tipo == 1) {
         e->x -= e->speed;
-        // Se colidir indo para a esquerda, gruda na direita do player
-        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
-            e->x = p->x + p->size;
+        e->angulo_onda += 0.08;
+        e->y = e->base_y + sin(e->angulo_onda) * 45.0; // Amplitude da onda de 45px
+
+        // Mantém a onda dentro dos limites da tela (600px)
+        if (e->y < 10.0) e->y = 10.0;
+        if (e->y + e->size > 590.0) e->y = 590.0 - e->size;
+
+        // Se sair pela esquerda, renasce na direita em uma nova altura
+        if (e->x + e->size < 0) {
+            e->x = 800.0 + (rand() % 200);
+            e->base_y = 80.0 + (rand() % 440);
         }
     }
-
-    // Movimento no Eixo Y
-    if (p->y > e->y) {
-        e->y += e->speed;
-        // Se colidir indo para baixo, gruda no topo do player
-        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
-            e->y = p->y - e->size;
-        }
-    }
-    else if (p->y < e->y) {
-        e->y -= e->speed;
-        // Se colidir indo para cima, gruda na base do player
-        if (e->x + e->size > p->x && e->x < p->x + p->size && e->y + e->size > p->y && e->y < p->y + p->size) {
-            e->y = p->y + p->size;
-        }
-    }
-
-    // Colisão do ataque do Player no Inimigo
-    if (p->is_attacking == 1) {
-        if (p->attack_direction == 1 && p->y - 15 < e->y + e->size && p->y > e->y && p->x + p->size > e->x && p->x < e->x + e->size) {
-            e->hp--;
-            e->y -= 40; // Knockback
-        }
-        else if (p->attack_direction == 2 && p->y + p->size + 15 > e->y && p->y + p->size < e->y + e->size && p->x + p->size > e->x && p->x < e->x + e->size) {
-            e->hp--;
-            e->y += 40; // Knockback
-        }
-        else if (p->attack_direction == 3 && p->x - 15 < e->x + e->size && p->x > e->x && p->y + p->size > e->y && p->y < e->y + e->size) {
-            e->hp--;
-            e->x -= 40; // Knockback
-        }
-        else if (p->attack_direction == 4 && p->x + p->size + 15 > e->x && p->x + p->size < e->x + e->size && p->y + p->size > e->y && p->y < e->y + e->size) {
-            e->hp--;
-            e->x += 40; // Knockback
-        }
-        if (e->hp <= 0) e->alive = 0;
-    }*/
-}
-
-bool check_collision(Player p, Enemy e) {
-    if (e.alive == 0) return false;
-
-	// Verifica se há colisão entre o player e o inimigo
-	return (p.x < e.x + e.size &&
-		p.x + p.size > e.x &&
-		p.y < e.y + e.size &&
-		p.y + p.size > e.y);
 }
 
 void draw_enemy(Enemy e) {
-    if (e.alive == 1) {
-        if (e.tipo == 0) {
-			al_draw_filled_rectangle(e.x, e.y, e.x + e.size, e.y + e.size, al_map_rgb(110, 110, 115)); // Obstáculo
-        }
-        else {
-			al_draw_filled_rectangle(e.x, e.y, e.x + e.size, e.y + e.size, al_map_rgb(180, 40, 80)); // Inimigo)
-        }
+    if (e.tipo == 0) {
+        // Obstáculo Estático / AMARELO
+        al_draw_filled_rectangle(e.x, e.y, e.x + e.size, e.y + e.size, al_map_rgb(255, 220, 0));
+    }
+    else {
+        // Inimigo em Ondas / VERMELHO
+        al_draw_filled_rectangle(e.x, e.y, e.x + e.size, e.y + e.size, al_map_rgb(235, 50, 50));
     }
 }
 
-/*void draw_enemy(Enemy e) {
-    if (e.alive == 1) {
-        // Inimigo verde
-        al_draw_rectangle(e.x, e.y, e.x + e.size, e.y + e.size, al_map_rgb(0, 255, 0), 3.0);
-        // Barra de Vida
-        al_draw_rectangle(e.x, e.y - 8, e.x + (e.hp * 10), e.y - 4, al_map_rgb(255, 0, 0), 2.0);
+int check_collision(Player p, Enemy e) {
+    // Colisão AABB (caixa contra caixa)
+    if (p.x < e.x + e.size &&
+        p.x + p.size > e.x &&
+        p.y < e.y + e.size &&
+        p.y + p.size > e.y) {
+        return 1;
     }
-}*/
+    return 0;
+}
