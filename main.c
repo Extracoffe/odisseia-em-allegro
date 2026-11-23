@@ -9,13 +9,12 @@
 #include "player.h"
 #include "enemy.h"
 
-#define TOTAL_OBSTACULOS 5
-#define TOTAL_INIMIGOS 5
-#define TOTAL_ENTIDADES (TOTAL_OBSTACULOS + TOTAL_INIMIGOS) // 10 no total
+#define TOTAL_FASES 5
+#define MAX_ENTIDADES 20 // Capacidade máxima (até 10 obstáculos + 10 monstros)
 
 typedef struct {
     const char* pergunta;
-    const char* opcoes; // Ex: "[1] Polifemo   [2] Medusa   [3] Minotauro"
+    const char* opcoes;
     int resposta_correta; // 1, 2 ou 3
 } QuizOdisseia;
 
@@ -53,7 +52,14 @@ QuizOdisseia banco_quiz[] = {
 };
 #define TOTAL_QUIZ 30
 
-//Algoritmo para embaralhar as perguntas do quiz e gerar uma ordem aleatória
+const char* nomes_fases[TOTAL_FASES] = {
+    "Fase 1: Mar de Troia",
+    "Fase 2: Ilha dos Ciclopes",
+    "Fase 3: Canto das Sereias",
+    "Fase 4: Cila e Caribdis",
+    "Fase 5: A Furia de Poseidon"
+};
+
 int ordem_quiz[TOTAL_QUIZ];
 int indice_fila_quiz = 0;
 
@@ -70,24 +76,43 @@ void embaralhar_quiz() {
     indice_fila_quiz = 0;
 }
 
-void reiniciar_jogo(Player* player, Enemy entidades[], int* tempo_restante, ALLEGRO_TIMER* fase_timer) {
-    embaralhar_quiz();
+// Configura os inimigos, tempo e velocidade de acordo com a fase (1 a 5)
+void preparar_fase(Player* player, Enemy entidades[], int fase, int* total_ativos, int* tempo_restante, float* velocidade_mar, ALLEGRO_TIMER* fase_timer) {
     init_player(player);
-    *tempo_restante = 15;
 
-    // Os 5 primeiros índices (0 a 4) são Obstáculos Estáticos (Amarelos)
-    for (int i = 0; i < TOTAL_OBSTACULOS; i++) {
+    // Tempo cresce 5s por fase: 15s, 20s, 25s, 30s, 35s
+    *tempo_restante = 10 + (fase * 5);
+
+    // Correnteza do mar acelera a cada fase
+    *velocidade_mar = 2.5 + (fase - 1) * 0.6;
+
+    // Quantidade de cada tipo sobe de 3 (Fase 1) até 7 (Fase 5)
+    int qtd_obstaculos = 2 + fase;
+    int qtd_inimigos = 2 + fase;
+    *total_ativos = qtd_obstaculos + qtd_inimigos;
+
+    float multiplicador_vel = 1.0 + (fase - 1) * 0.20; // +20% velocidade por fase
+
+    // Obstáculos estáticos (rochas e naufrágios)
+    for (int i = 0; i < qtd_obstaculos; i++) {
         init_enemy(&entidades[i], 0);
     }
 
-    // Os 5 últimos índices (5 a 9) são Inimigos em Ondas (Vermelhos)
-    for (int i = TOTAL_OBSTACULOS; i < TOTAL_ENTIDADES; i++) {
+    // Inimigos em ondas (monstros e sereias)
+    for (int i = qtd_obstaculos; i < *total_ativos; i++) {
         init_enemy(&entidades[i], 1);
-        // Espalha os inimigos na horizontal para não virem todos empilhados
-        entidades[i].x = 800.0 + ((i - TOTAL_OBSTACULOS) * 180.0);
+        entidades[i].speed *= multiplicador_vel;
+        entidades[i].x = 800.0 + ((i - qtd_obstaculos) * 180.0);
     }
 
     al_start_timer(fase_timer);
+}
+
+// Reseta a campanha inteira (volta para a Fase 1 e reembaralha o quiz)
+void iniciar_novo_jogo(Player* player, Enemy entidades[], int* fase_atual, int* total_ativos, int* tempo_restante, float* velocidade_mar, ALLEGRO_TIMER* fase_timer) {
+    *fase_atual = 1;
+    embaralhar_quiz();
+    preparar_fase(player, entidades, *fase_atual, total_ativos, tempo_restante, velocidade_mar, fase_timer);
 }
 
 int main() {
@@ -97,12 +122,16 @@ int main() {
     if (!al_init_ttf_addon()) return -1;
     if (!al_init_primitives_addon()) return -1;
     if (!al_init_image_addon()) return -1;
+
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
     carregar_sprites_inimigos();
 
     srand((unsigned int)time(NULL));
 
     const int LARGURA_TELA = 800;
     const int ALTURA_TELA = 600;
+
+    al_set_new_display_option(ALLEGRO_VSYNC, 2, ALLEGRO_SUGGEST); //Desativa o v-sync forçado que trava o loop
 
     ALLEGRO_DISPLAY* display = al_create_display(LARGURA_TELA, ALTURA_TELA);
     if (!display) return -1;
@@ -123,20 +152,24 @@ int main() {
 
     al_start_timer(timer);
 
-    // 0 = Menu, 1 = Jogando, 2 = Vitória, 3 = Game Over
+    // 0 = Menu, 1 = Jogando, 2 = Vitória Final, 3 = Game Over, 4 = Quiz, 5 = Fase Concluída
     int game_state = 0;
+    int fase_atual = 1;
+    int total_ativos = 0;
     int quiz_atual = 0;
     int inimigo_colidido = -1;
     int up = 0, down = 0, left = 0, right = 0;
     int tempo_restante = 15;
 
     Player player = { 0 };
-    Enemy entidades[TOTAL_ENTIDADES];
+    Enemy entidades[MAX_ENTIDADES];
     ALLEGRO_BITMAP* bg_mar = al_load_bitmap("sprites/mar.png");
     float scroll_x = 0.0;
     float velocidade_mar = 2.5;
 
     bool rodando = true;
+    bool redesenhar = false;
+
     while (rodando) {
         ALLEGRO_EVENT event;
         al_wait_for_event(event_queue, &event);
@@ -148,7 +181,7 @@ int main() {
         if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
             if (game_state == 0) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_SPACE || event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
-                    reiniciar_jogo(&player, entidades, &tempo_restante, fase_timer);
+                    iniciar_novo_jogo(&player, entidades, &fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
                     game_state = 1;
                 }
             }
@@ -170,7 +203,7 @@ int main() {
             }
             else if (game_state == 2 || game_state == 3) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_R) {
-                    reiniciar_jogo(&player, entidades, &tempo_restante, fase_timer);
+                    iniciar_novo_jogo(&player, entidades, &fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
                     game_state = 1;
                 }
                 else if (event.keyboard.keycode == ALLEGRO_KEY_M) {
@@ -197,6 +230,13 @@ int main() {
                     }
                 }
             }
+            else if (game_state == 5) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_SPACE || event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    fase_atual++;
+                    preparar_fase(&player, entidades, fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
+                    game_state = 1;
+                }
+            }
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_UP) {
@@ -216,23 +256,56 @@ int main() {
             }
         }
 
-        // Contagem regressiva da fase (15s)
+        // Contagem regressiva da fase
         if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == fase_timer) {
             if (game_state == 1) {
                 tempo_restante--;
                 if (tempo_restante <= 0) {
                     al_stop_timer(fase_timer);
-                    game_state = 2; // Vitória
+                    up = down = left = right = 0;
+                    if (fase_atual < TOTAL_FASES) {
+                        game_state = 5;
+                    }
+                    else {
+                        game_state = 2;
+                    }
                 }
             }
         }
 
-        // Atualização e desenho (60 FPS)
+        // Atualização da lógica a 60 FPS (sem desenhar ainda!)
         if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == timer) {
-            scroll_x -= velocidade_mar;
-            if (scroll_x <= -LARGURA_TELA) {
-                scroll_x = 0.0;
+            if (game_state == 1) {
+                scroll_x -= velocidade_mar;
+                if (scroll_x <= -LARGURA_TELA) {
+                    scroll_x = 0.0;
+                }
+
+                update_player(&player, up, down, left, right);
+
+                for (int i = 0; i < total_ativos; i++) {
+                    update_enemy(&entidades[i]);
+
+                    if (check_collision(player, entidades[i])) {
+                        al_stop_timer(fase_timer);
+                        inimigo_colidido = i;
+                        if (indice_fila_quiz >= TOTAL_QUIZ) {
+                            embaralhar_quiz();
+                        }
+                        quiz_atual = ordem_quiz[indice_fila_quiz];
+                        indice_fila_quiz++;
+                        up = down = left = right = 0;
+                        game_state = 4;
+                        break;
+                    }
+                }
             }
+            redesenhar = true; // Marca que a tela precisa ser atualizada
+        }
+
+        // Só desenha quando TODOS os eventos de teclado e timer pendentes já foram lidos
+        if (redesenhar && al_is_event_queue_empty(event_queue)) {
+            redesenhar = false;
 
             if (bg_mar) {
                 int w = al_get_bitmap_width(bg_mar);
@@ -245,51 +318,43 @@ int main() {
             }
 
             if (game_state == 0) {
-                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 220, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
-                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 270, ALLEGRO_ALIGN_CENTER, "Desvie dos obstaculos (amarelos) e monstros (vermelhos) por 15s!");
-                al_draw_text(font, al_map_rgb(100, 255, 100), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Jogar");
+                al_draw_text(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
+                al_draw_text(font, al_map_rgb(220, 220, 220), LARGURA_TELA / 2, 255, ALLEGRO_ALIGN_CENTER, "Atravesse os 5 mares mitologicos para voltar a Itaca!");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 285, ALLEGRO_ALIGN_CENTER, "Use WASD ou Setas para navegar e responda aos deuses se colidir.");
+                al_draw_text(font, al_map_rgb(100, 255, 100), LARGURA_TELA / 2, 345, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Zarpar");
             }
             else if (game_state == 1) {
-                update_player(&player, up, down, left, right);
-
-                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
-                    update_enemy(&entidades[i]);
-
-                    if (check_collision(player, entidades[i])) {
-                        al_stop_timer(fase_timer);
-                        inimigo_colidido = i;
-                        if (indice_fila_quiz >= TOTAL_QUIZ) {
-                            embaralhar_quiz(); // Caso o jogador acerte todas as 30 na mesma partida, reembaralha
-                        }
-                        quiz_atual = ordem_quiz[indice_fila_quiz];
-                        indice_fila_quiz++;
-                        up = down = left = right = 0; // Zera teclas presas para o barco não andar sozinho depois
-                        game_state = 4; // Estado de Pergunta
-                        break;
-                    }
-                }
-
                 draw_player(player);
-                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
+                for (int i = 0; i < total_ativos; i++) {
                     draw_enemy(entidades[i]);
                 }
 
                 al_draw_textf(font, al_map_rgb(255, 255, 255), 20, 20, 0, "Tempo: %ds", tempo_restante);
+                al_draw_textf(font, al_map_rgb(255, 215, 0), LARGURA_TELA - 20, 20, ALLEGRO_ALIGN_RIGHT, "%s (%d/%d)", nomes_fases[fase_atual - 1], fase_atual, TOTAL_FASES);
             }
             else if (game_state == 2) {
-                al_draw_text(font, al_map_rgb(0, 255, 0), LARGURA_TELA / 2, 240, ALLEGRO_ALIGN_CENTER, "PARABENS! VOCE SOBREVIVEU A FASE!");
-                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 300, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Reiniciar ou 'M' para o Menu");
+                al_draw_filled_rectangle(100, 190, 700, 390, al_map_rgba(10, 15, 30, 220));
+                al_draw_rectangle(100, 190, 700, 390, al_map_rgb(100, 255, 100), 3.0);
+
+                al_draw_text(font, al_map_rgb(100, 255, 100), LARGURA_TELA / 2, 230, ALLEGRO_ALIGN_CENTER, "GLORIA A ODISSEU! VOCE CHEGOU A ITACA!");
+                al_draw_text(font, al_map_rgb(220, 220, 220), LARGURA_TELA / 2, 275, ALLEGRO_ALIGN_CENTER, "Voce superou todos os 5 mares e desafios dos deuses.");
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Jogar Novamente ou 'M' para o Menu");
             }
             else if (game_state == 3) {
-                al_draw_text(font, al_map_rgb(255, 60, 60), LARGURA_TELA / 2, 240, ALLEGRO_ALIGN_CENTER, "GAME OVER - O navio colidiu!");
-                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 300, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Tentar Novamente ou 'M' para o Menu");
+                al_draw_filled_rectangle(120, 190, 680, 390, al_map_rgba(10, 15, 30, 220));
+                al_draw_rectangle(120, 190, 680, 390, al_map_rgb(255, 60, 60), 3.0);
+
+                al_draw_text(font, al_map_rgb(255, 60, 60), LARGURA_TELA / 2, 230, ALLEGRO_ALIGN_CENTER, "GAME OVER - O navio naufragou!");
+                al_draw_textf(font, al_map_rgb(220, 220, 220), LARGURA_TELA / 2, 275, ALLEGRO_ALIGN_CENTER, "Voce caiu na %s", nomes_fases[fase_atual - 1]);
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Tentar Novamente ou 'M' para o Menu");
             }
             else if (game_state == 4) {
                 draw_player(player);
-                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
+                for (int i = 0; i < total_ativos; i++) {
                     draw_enemy(entidades[i]);
                 }
                 al_draw_textf(font, al_map_rgb(255, 255, 255), 20, 20, 0, "Tempo: %ds", tempo_restante);
+                al_draw_textf(font, al_map_rgb(255, 215, 0), LARGURA_TELA - 20, 20, ALLEGRO_ALIGN_RIGHT, "%s (%d/%d)", nomes_fases[fase_atual - 1], fase_atual, TOTAL_FASES);
 
                 al_draw_filled_rectangle(60, 190, 740, 410, al_map_rgba(10, 15, 30, 235));
                 al_draw_rectangle(60, 190, 740, 410, al_map_rgb(255, 215, 0), 3.0);
@@ -298,6 +363,17 @@ int main() {
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 275, ALLEGRO_ALIGN_CENTER, banco_quiz[quiz_atual].pergunta);
                 al_draw_text(font, al_map_rgb(100, 255, 150), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, banco_quiz[quiz_atual].opcoes);
                 al_draw_text(font, al_map_rgb(180, 180, 180), LARGURA_TELA / 2, 380, ALLEGRO_ALIGN_CENTER, "Pressione 1, 2 ou 3 no teclado");
+            }
+            else if (game_state == 5) {
+                draw_player(player);
+
+                al_draw_filled_rectangle(100, 185, 700, 405, al_map_rgba(10, 15, 30, 230));
+                al_draw_rectangle(100, 185, 700, 405, al_map_rgb(100, 200, 255), 3.0);
+
+                al_draw_textf(font, al_map_rgb(100, 255, 150), LARGURA_TELA / 2, 220, ALLEGRO_ALIGN_CENTER, "%s CONCLUIDA!", nomes_fases[fase_atual - 1]);
+                al_draw_textf(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 265, ALLEGRO_ALIGN_CENTER, "Proximo destino: %s", nomes_fases[fase_atual]);
+                al_draw_textf(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 305, ALLEGRO_ALIGN_CENTER, "Novo tempo de travessia: %d segundos", 10 + ((fase_atual + 1) * 5));
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 360, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Continuar");
             }
 
             al_flip_display();
