@@ -115,6 +115,26 @@ void iniciar_novo_jogo(Player* player, Enemy entidades[], int* fase_atual, int* 
     preparar_fase(player, entidades, *fase_atual, total_ativos, tempo_restante, velocidade_mar, fase_timer);
 }
 
+bool tela_cheia = false;
+float escala_x = 1.0f;
+float escala_y = 1.0f;
+
+// Caixa clicável da opção de Tela Cheia dentro da tela de Configurações
+int cfg_tela_x = 220, cfg_tela_y = 250, cfg_tela_w = 360, cfg_tela_h = 45;
+// Botão Voltar (usado tanto em Configurações quanto em Créditos)
+int bt_voltar_x = 300, bt_voltar_y = 460, bt_voltar_w = 200, bt_voltar_h = 40;
+
+void alternar_tela_cheia(ALLEGRO_DISPLAY* display, bool* tela_cheia, float* escala_x, float* escala_y) {
+    *tela_cheia = !(*tela_cheia);
+    al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, *tela_cheia);
+
+    int w_atual = al_get_display_width(display);
+    int h_atual = al_get_display_height(display);
+
+    *escala_x = (float)w_atual / 800.0f;
+    *escala_y = (float)h_atual / 600.0f;
+}
+
 int main() {
     if (!al_init()) return -1;
     if (!al_install_keyboard()) return -1;
@@ -136,6 +156,9 @@ int main() {
 
     ALLEGRO_DISPLAY* display = al_create_display(LARGURA_TELA, ALTURA_TELA);
     if (!display) return -1;
+
+    ALLEGRO_BITMAP* buffer = al_create_bitmap(LARGURA_TELA, ALTURA_TELA);
+    if (!buffer) return -1;
 
     ALLEGRO_EVENT_QUEUE* event_queue = al_create_event_queue();
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
@@ -198,19 +221,49 @@ int main() {
         }
 
         // Clique do mouse na Tela Inicial (Menu)
-        if (game_state == 0 && event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
-            int mouse_x = event.mouse.x;
-            int mouse_y = event.mouse.y;
+        if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+            // Converte o clique real da janela/monitor para a escala virtual 800x600
+            int mouse_x = (int)(event.mouse.x / escala_x);
+            int mouse_y = (int)(event.mouse.y / escala_y);
 
-            if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
-                mouse_y >= bt_jogar_y && mouse_y <= bt_jogar_y + bt_height) {
-                al_flush_event_queue(event_queue);
-                iniciar_novo_jogo(&player, entidades, &fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
-                game_state = 1;
+            if (game_state == 0) {
+                if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                    mouse_y >= bt_jogar_y && mouse_y <= bt_jogar_y + bt_height) {
+                    al_flush_event_queue(event_queue);
+                    iniciar_novo_jogo(&player, entidades, &fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
+                    game_state = 1;
+                }
+                else if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                    mouse_y >= bt_config_y && mouse_y <= bt_config_y + bt_height) {
+                    game_state = 7; // Abre Configurações
+                }
+                else if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                    mouse_y >= bt_creditos_y && mouse_y <= bt_creditos_y + bt_height) {
+                    game_state = 8; // Abre Créditos
+                }
+                else if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                    mouse_y >= bt_sair_y && mouse_y <= bt_sair_y + bt_height) {
+                    rodando = false;
+                }
             }
-            else if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
-                mouse_y >= bt_sair_y && mouse_y <= bt_sair_y + bt_height) {
-                rodando = false;
+            else if (game_state == 7) {
+                // Clicou na caixa de Tela Cheia
+                if (mouse_x >= cfg_tela_x && mouse_x <= cfg_tela_x + cfg_tela_w &&
+                    mouse_y >= cfg_tela_y && mouse_y <= cfg_tela_y + cfg_tela_h) {
+                    alternar_tela_cheia(display, &tela_cheia, &escala_x, &escala_y);
+                }
+                // Clicou em Voltar
+                else if (mouse_x >= bt_voltar_x && mouse_x <= bt_voltar_x + bt_voltar_w &&
+                    mouse_y >= bt_voltar_y && mouse_y <= bt_voltar_y + bt_voltar_h) {
+                    game_state = 0;
+                }
+            }
+            else if (game_state == 8) {
+                // Clicou em Voltar nos Créditos
+                if (mouse_x >= bt_voltar_x && mouse_x <= bt_voltar_x + bt_voltar_w &&
+                    mouse_y >= bt_voltar_y && mouse_y <= bt_voltar_y + bt_voltar_h) {
+                    game_state = 0;
+                }
             }
         }
 
@@ -343,6 +396,8 @@ int main() {
         if (redesenhar && al_is_event_queue_empty(event_queue)) {
             redesenhar = false;
 
+            al_set_target_bitmap(buffer);
+
             if (bg_mar) {
                 int w = al_get_bitmap_width(bg_mar);
                 int h = al_get_bitmap_height(bg_mar);
@@ -424,6 +479,64 @@ int main() {
                 al_draw_textf(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 305, ALLEGRO_ALIGN_CENTER, "Novo tempo de travessia: %d segundos", 10 + ((fase_atual + 1) * 5));
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 360, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Continuar");
             }
+            else if (game_state == 7) {
+                // Fundo do menu escurecido
+                if (img_fundo) {
+                    al_draw_scaled_bitmap(img_fundo, 0, 0, al_get_bitmap_width(img_fundo), al_get_bitmap_height(img_fundo), 0, 0, LARGURA_TELA, ALTURA_TELA, 0);
+                }
+                al_draw_filled_rectangle(140, 120, 660, 530, al_map_rgba(10, 15, 30, 230));
+                al_draw_rectangle(140, 120, 660, 530, al_map_rgb(255, 215, 0), 3.0);
+
+                al_draw_text(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 150, ALLEGRO_ALIGN_CENTER, "CONFIGURACOES & CONTROLES");
+
+                // Botão interativo de Tela Cheia
+                al_draw_filled_rectangle(cfg_tela_x, cfg_tela_y, cfg_tela_x + cfg_tela_w, cfg_tela_y + cfg_tela_h, al_map_rgb(30, 45, 75));
+                al_draw_rectangle(cfg_tela_x, cfg_tela_y, cfg_tela_x + cfg_tela_w, cfg_tela_y + cfg_tela_h, al_map_rgb(100, 200, 255), 2.0);
+                al_draw_textf(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, cfg_tela_y + 18, ALLEGRO_ALIGN_CENTER,
+                    "Modo de Tela: %s (Clique)", tela_cheia ? "TELA CHEIA" : "JANELA 800x600");
+
+                // Resumo dos controles
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, "Mover Navio: W A S D ou Setas");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 355, ALLEGRO_ALIGN_CENTER, "Responder Quiz: Teclas 1, 2 ou 3");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 380, ALLEGRO_ALIGN_CENTER, "Atalho Tela Cheia: F11");
+
+                // Botão Voltar
+                al_draw_filled_rectangle(bt_voltar_x, bt_voltar_y, bt_voltar_x + bt_voltar_w, bt_voltar_y + bt_voltar_h, al_map_rgb(150, 40, 40));
+                al_draw_rectangle(bt_voltar_x, bt_voltar_y, bt_voltar_x + bt_voltar_w, bt_voltar_y + bt_voltar_h, al_map_rgb(255, 255, 255), 2.0);
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, bt_voltar_y + 16, ALLEGRO_ALIGN_CENTER, "VOLTAR AO MENU");
+            }
+            else if (game_state == 8) {
+                if (img_fundo) {
+                    al_draw_scaled_bitmap(img_fundo, 0, 0, al_get_bitmap_width(img_fundo), al_get_bitmap_height(img_fundo), 0, 0, LARGURA_TELA, ALTURA_TELA, 0);
+                }
+                al_draw_filled_rectangle(140, 120, 660, 530, al_map_rgba(10, 15, 30, 230));
+                al_draw_rectangle(140, 120, 660, 530, al_map_rgb(255, 215, 0), 3.0);
+
+                al_draw_text(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 150, ALLEGRO_ALIGN_CENTER, "CREDITOS");
+                al_draw_text(font, al_map_rgb(100, 255, 150), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 245, ALLEGRO_ALIGN_CENTER, "Desenvolvimento & Programacao:");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 265, ALLEGRO_ALIGN_CENTER, "Andre Rodarte, Kaua Vicentini e Pedro Tutsumi");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 305, ALLEGRO_ALIGN_CENTER, "Tecnologias:");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 325, ALLEGRO_ALIGN_CENTER, "Linguagem C & Biblioteca Allegro 5");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 365, ALLEGRO_ALIGN_CENTER, "Inspiracao:");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 385, ALLEGRO_ALIGN_CENTER, "Poema Epico 'A Odisseia' de Homero");
+
+                // Botão Voltar
+                al_draw_filled_rectangle(bt_voltar_x, bt_voltar_y, bt_voltar_x + bt_voltar_w, bt_voltar_y + bt_voltar_h, al_map_rgb(150, 40, 40));
+                al_draw_rectangle(bt_voltar_x, bt_voltar_y, bt_voltar_x + bt_voltar_w, bt_voltar_y + bt_voltar_h, al_map_rgb(255, 255, 255), 2.0);
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, bt_voltar_y + 16, ALLEGRO_ALIGN_CENTER, "VOLTAR AO MENU");
+            }
+
+            al_set_target_backbuffer(display);
+            al_draw_scaled_bitmap(
+                buffer,
+                0, 0, LARGURA_TELA, ALTURA_TELA,
+                0, 0, al_get_display_width(display), al_get_display_height(display),
+                0
+            );
 
             al_flip_display();
         }
