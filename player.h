@@ -8,6 +8,7 @@ typedef struct {
     float x, y;
     int size;
     float speed;
+    float angulo; // Guarda a inclinação atual do barco
     ALLEGRO_BITMAP* sprite;
     /*int attack_direction;
     int is_attacking;

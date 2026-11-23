@@ -19,9 +19,14 @@ typedef struct {
 	//variavel que define o angulo da onda do inimigo
     int angulo_onda;
 	float base_y;
+	ALLEGRO_BITMAP* sprite;
 
 } Enemy;
 
+//função que carrega os sprites inimigos
+void carregar_sprites_inimigos();
+//função que destroi os sprites inimigos
+void destruir_sprites_inimigos();
 //função que inicializa o inimigo
 void init_enemy(Enemy *e, int tipo);
 //função que atualiza o inimigo

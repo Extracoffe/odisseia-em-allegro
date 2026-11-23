@@ -24,11 +24,54 @@ QuizOdisseia banco_quiz[] = {
     { "Qual deus enviou tempestades contra Odisseu?", "[1] Hades   [2] Poseidon   [3] Ares", 2 },
     { "Como Odisseu escapou do canto das sereias?", "[1] Tapou os ouvidos   [2] Amarrou-se ao mastro   [3] Fugiu a nado", 2 },
     { "Quem esperou Odisseu em Itaca por 20 anos?", "[1] Helena   [2] Circe   [3] Penelope", 3 },
-    { "Qual feiticeira transformou seus homens em porcos?", "[1] Calipso   [2] Circe   [3] Atena", 2 }
+    { "Qual feiticeira transformou seus homens em porcos?", "[1] Calipso   [2] Circe   [3] Atena", 2 },
+    { "Qual era o nome falso que Odisseu deu a Polifemo?", "[1] Ninguem   [2] Ulisses   [3] Aquiles", 1 },
+    { "Qual deusa ajudou e protegeu Odisseu na jornada?", "[1] Hera   [2] Afrodite   [3] Atena", 3 },
+    { "Qual monstro marinho tinha seis cabecas?", "[1] Caribdis   [2] Cila   [3] Hidra", 2 },
+    { "Qual monstro criava um redemoinho mortal no mar?", "[1] Caribdis   [2] Cila   [3] Medusa", 1 },
+    { "Como se chamava o filho de Odisseu e Penelope?", "[1] Telemaco   [2] Heitor   [3] Paris", 1 },
+    { "Qual o nome do reino governado por Odisseu?", "[1] Esparta   [2] Itaca   [3] Micenas", 2 },
+    { "Quanto tempo durou a Guerra de Troia antes da viagem?", "[1] 5 anos   [2] 10 anos   [3] 20 anos", 2 },
+    { "Quem era o pai do ciclope Polifemo?", "[1] Zeus   [2] Cronos   [3] Poseidon", 3 },
+    { "O que Penelope tecia e desmanchava toda noite?", "[1] Uma mortalha   [2] Uma vela de barco   [3] Um manto real", 1 },
+    { "Qual planta fazia os marinheiros esquecerem de voltar?", "[1] Ambrosia   [2] Flor de Lotus   [3] Cicuta", 2 },
+    { "Quem entregou um saco com todos os ventos a Odisseu?", "[1] Hermes   [2] Eolo   [3] Apolo", 2 },
+    { "Por que o saco dos ventos foi aberto antes da hora?", "[1] Curiosidade e ganancia   [2] Ataque de sereias   [3] Ordem de Zeus", 1 },
+    { "Qual ninfa prendeu Odisseu em sua ilha por 7 anos?", "[1] Calipso   [2] Dafne   [3] Eco", 1 },
+    { "Qual deus mensageiro deu a erva moli contra Circe?", "[1] Apolo   [2] Hermes   [3] Hefesto", 2 },
+    { "Quem Odisseu foi consultar no Submundo (Hades)?", "[1] Agamenon   [2] Tiresias   [3] Aquiles", 2 },
+    { "Qual foi a prova final de Penelope para os pretendentes?", "[1] Luta de espadas   [2] Atirar com o arco   [3] Corrida de barcos", 2 },
+    { "Quem foi o unico a reconhecer Odisseu disfarcado de mendigo?", "[1] Seu cao Argos   [2] Um pretendente   [3] O rei Menelau", 1 },
+    { "Como Odisseu e seus homens fugiram da caverna de Polifemo?", "[1] Cavando um tunel   [2] Presos sob ovelhas   [3] Invisiveis", 2 },
+    { "Qual povo acolheu Odisseu e o levou de volta a Itaca?", "[1] Feacios   [2] Troianos   [3] Cicones", 1 },
+    { "O que os marinheiros comeram na ilha do deus Helios?", "[1] Frutos proibidos   [2] O gado sagrado   [3] Peixes dourados", 2 },
+    { "Quem era o pai de Odisseu?", "[1] Laertes   [2] Priamo   [3] Nestor", 1 },
+    { "Qual estrategia de Odisseu venceu a Guerra de Troia?", "[1] Fogo grego   [2] Cavalo de madeira   [3] Cerco naval", 2 },
+    { "Quem eram os gigantes canibais que destruiram 11 navios?", "[1] Lestrigoes   [2] Centauros   [3] Titas", 1 },
+    { "Qual princesa feacia encontrou Odisseu na praia?", "[1] Nausicaa   [2] Andromaca   [3] Cassandra", 1 },
+    { "Quem escreveu o poema epico A Odisseia?", "[1] Sofocles   [2] Homero   [3] Hesiodo", 2 }
 };
-#define TOTAL_QUIZ 5
+#define TOTAL_QUIZ 30
+
+//Algoritmo para embaralhar as perguntas do quiz e gerar uma ordem aleatória
+int ordem_quiz[TOTAL_QUIZ];
+int indice_fila_quiz = 0;
+
+void embaralhar_quiz() {
+    for (int i = 0; i < TOTAL_QUIZ; i++) {
+        ordem_quiz[i] = i;
+    }
+    for (int i = TOTAL_QUIZ - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int temp = ordem_quiz[i];
+        ordem_quiz[i] = ordem_quiz[j];
+        ordem_quiz[j] = temp;
+    }
+    indice_fila_quiz = 0;
+}
 
 void reiniciar_jogo(Player* player, Enemy entidades[], int* tempo_restante, ALLEGRO_TIMER* fase_timer) {
+    embaralhar_quiz();
     init_player(player);
     *tempo_restante = 15;
 
@@ -54,6 +97,7 @@ int main() {
     if (!al_init_ttf_addon()) return -1;
     if (!al_init_primitives_addon()) return -1;
     if (!al_init_image_addon()) return -1;
+    carregar_sprites_inimigos();
 
     srand((unsigned int)time(NULL));
 
@@ -214,7 +258,11 @@ int main() {
                     if (check_collision(player, entidades[i])) {
                         al_stop_timer(fase_timer);
                         inimigo_colidido = i;
-                        quiz_atual = rand() % TOTAL_QUIZ;
+                        if (indice_fila_quiz >= TOTAL_QUIZ) {
+                            embaralhar_quiz(); // Caso o jogador acerte todas as 30 na mesma partida, reembaralha
+                        }
+                        quiz_atual = ordem_quiz[indice_fila_quiz];
+                        indice_fila_quiz++;
                         up = down = left = right = 0; // Zera teclas presas para o barco não andar sozinho depois
                         game_state = 4; // Estado de Pergunta
                         break;
@@ -262,6 +310,7 @@ int main() {
     al_destroy_timer(timer);
     al_destroy_timer(fase_timer);
     destroy_player(&player);
+    destruir_sprites_inimigos();
     if (bg_mar) al_destroy_bitmap(bg_mar);
 
     return 0;
