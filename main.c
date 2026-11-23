@@ -13,6 +13,21 @@
 #define TOTAL_INIMIGOS 5
 #define TOTAL_ENTIDADES (TOTAL_OBSTACULOS + TOTAL_INIMIGOS) // 10 no total
 
+typedef struct {
+    const char* pergunta;
+    const char* opcoes; // Ex: "[1] Polifemo   [2] Medusa   [3] Minotauro"
+    int resposta_correta; // 1, 2 ou 3
+} QuizOdisseia;
+
+QuizOdisseia banco_quiz[] = {
+    { "Qual ciclope Odisseu cegou na caverna?", "[1] Polifemo   [2] Argos   [3] Tifao", 1 },
+    { "Qual deus enviou tempestades contra Odisseu?", "[1] Hades   [2] Poseidon   [3] Ares", 2 },
+    { "Como Odisseu escapou do canto das sereias?", "[1] Tapou os ouvidos   [2] Amarrou-se ao mastro   [3] Fugiu a nado", 2 },
+    { "Quem esperou Odisseu em Itaca por 20 anos?", "[1] Helena   [2] Circe   [3] Penelope", 3 },
+    { "Qual feiticeira transformou seus homens em porcos?", "[1] Calipso   [2] Circe   [3] Atena", 2 }
+};
+#define TOTAL_QUIZ 5
+
 void reiniciar_jogo(Player* player, Enemy entidades[], int* tempo_restante, ALLEGRO_TIMER* fase_timer) {
     init_player(player);
     *tempo_restante = 15;
@@ -66,6 +81,8 @@ int main() {
 
     // 0 = Menu, 1 = Jogando, 2 = Vitória, 3 = Game Over
     int game_state = 0;
+    int quiz_atual = 0;
+    int inimigo_colidido = -1;
     int up = 0, down = 0, left = 0, right = 0;
     int tempo_restante = 15;
 
@@ -115,6 +132,25 @@ int main() {
                 else if (event.keyboard.keycode == ALLEGRO_KEY_M) {
                     al_stop_timer(fase_timer);
                     game_state = 0;
+                }
+            }
+            else if (game_state == 4) {
+                int escolha = 0;
+                if (event.keyboard.keycode == ALLEGRO_KEY_1 || event.keyboard.keycode == ALLEGRO_KEY_PAD_1) escolha = 1;
+                if (event.keyboard.keycode == ALLEGRO_KEY_2 || event.keyboard.keycode == ALLEGRO_KEY_PAD_2) escolha = 2;
+                if (event.keyboard.keycode == ALLEGRO_KEY_3 || event.keyboard.keycode == ALLEGRO_KEY_PAD_3) escolha = 3;
+
+                if (escolha != 0) {
+                    if (escolha == banco_quiz[quiz_atual].resposta_correta) {
+                        if (inimigo_colidido != -1) {
+                            entidades[inimigo_colidido].x = 950.0;
+                        }
+                        al_start_timer(fase_timer);
+                        game_state = 1;
+                    }
+                    else {
+                        game_state = 3;
+                    }
                 }
             }
         }
@@ -177,7 +213,11 @@ int main() {
 
                     if (check_collision(player, entidades[i])) {
                         al_stop_timer(fase_timer);
-                        game_state = 3; // Game Over
+                        inimigo_colidido = i;
+                        quiz_atual = rand() % TOTAL_QUIZ;
+                        up = down = left = right = 0; // Zera teclas presas para o barco não andar sozinho depois
+                        game_state = 4; // Estado de Pergunta
+                        break;
                     }
                 }
 
@@ -195,6 +235,21 @@ int main() {
             else if (game_state == 3) {
                 al_draw_text(font, al_map_rgb(255, 60, 60), LARGURA_TELA / 2, 240, ALLEGRO_ALIGN_CENTER, "GAME OVER - O navio colidiu!");
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 300, ALLEGRO_ALIGN_CENTER, "Pressione 'R' para Tentar Novamente ou 'M' para o Menu");
+            }
+            else if (game_state == 4) {
+                draw_player(player);
+                for (int i = 0; i < TOTAL_ENTIDADES; i++) {
+                    draw_enemy(entidades[i]);
+                }
+                al_draw_textf(font, al_map_rgb(255, 255, 255), 20, 20, 0, "Tempo: %ds", tempo_restante);
+
+                al_draw_filled_rectangle(60, 190, 740, 410, al_map_rgba(10, 15, 30, 235));
+                al_draw_rectangle(60, 190, 740, 410, al_map_rgb(255, 215, 0), 3.0);
+
+                al_draw_text(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 220, ALLEGRO_ALIGN_CENTER, "DESAFIO DOS DEUSES! RESPONDA PARA CONTINUAR:");
+                al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 275, ALLEGRO_ALIGN_CENTER, banco_quiz[quiz_atual].pergunta);
+                al_draw_text(font, al_map_rgb(100, 255, 150), LARGURA_TELA / 2, 330, ALLEGRO_ALIGN_CENTER, banco_quiz[quiz_atual].opcoes);
+                al_draw_text(font, al_map_rgb(180, 180, 180), LARGURA_TELA / 2, 380, ALLEGRO_ALIGN_CENTER, "Pressione 1, 2 ou 3 no teclado");
             }
 
             al_flip_display();
