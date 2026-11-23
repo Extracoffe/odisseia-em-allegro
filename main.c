@@ -71,6 +71,9 @@ int main() {
 
     Player player = { 0 };
     Enemy entidades[TOTAL_ENTIDADES];
+    ALLEGRO_BITMAP* bg_mar = al_load_bitmap("sprites/mar.png");
+    float scroll_x = 0.0;
+    float velocidade_mar = 2.5;
 
     bool rodando = true;
     while (rodando) {
@@ -146,7 +149,20 @@ int main() {
 
         // Atualização e desenho (60 FPS)
         if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == timer) {
-            al_clear_to_color(al_map_rgb(20, 25, 35));
+            scroll_x -= velocidade_mar;
+            if (scroll_x <= -LARGURA_TELA) {
+                scroll_x = 0.0;
+            }
+
+            if (bg_mar) {
+                int w = al_get_bitmap_width(bg_mar);
+                int h = al_get_bitmap_height(bg_mar);
+                al_draw_scaled_bitmap(bg_mar, 0, 0, w, h, scroll_x, 0, LARGURA_TELA, ALTURA_TELA, 0);
+                al_draw_scaled_bitmap(bg_mar, 0, 0, w, h, scroll_x + LARGURA_TELA, 0, LARGURA_TELA, ALTURA_TELA, 0);
+            }
+            else {
+                al_clear_to_color(al_map_rgb(20, 25, 35));
+            }
 
             if (game_state == 0) {
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 220, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
@@ -191,6 +207,7 @@ int main() {
     al_destroy_timer(timer);
     al_destroy_timer(fase_timer);
     destroy_player(&player);
+    if (bg_mar) al_destroy_bitmap(bg_mar);
 
     return 0;
 }
