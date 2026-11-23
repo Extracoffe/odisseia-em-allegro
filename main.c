@@ -118,6 +118,7 @@ void iniciar_novo_jogo(Player* player, Enemy entidades[], int* fase_atual, int* 
 int main() {
     if (!al_init()) return -1;
     if (!al_install_keyboard()) return -1;
+    if (!al_install_mouse()) return -1;
     if (!al_init_font_addon()) return -1;
     if (!al_init_ttf_addon()) return -1;
     if (!al_init_primitives_addon()) return -1;
@@ -147,6 +148,7 @@ int main() {
 
     al_register_event_source(event_queue, al_get_display_event_source(display));
     al_register_event_source(event_queue, al_get_keyboard_event_source());
+    al_register_event_source(event_queue, al_get_mouse_event_source());
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
     al_register_event_source(event_queue, al_get_timer_event_source(fase_timer));
 
@@ -164,6 +166,23 @@ int main() {
     Player player = { 0 };
     Enemy entidades[MAX_ENTIDADES];
     ALLEGRO_BITMAP* bg_mar = al_load_bitmap("sprites/mar.png");
+
+    // Carregamento de imagens do menu
+    ALLEGRO_BITMAP* img_fundo = al_load_bitmap("sprites/fundo.png");
+    ALLEGRO_BITMAP* img_titulo = al_load_bitmap("sprites/titulo.png");
+    ALLEGRO_BITMAP* img_bt_jogar = al_load_bitmap("sprites/jogar.png");
+    ALLEGRO_BITMAP* img_bt_config = al_load_bitmap("sprites/config.png");
+    ALLEGRO_BITMAP* img_bt_creditos = al_load_bitmap("sprites/creditos.png");
+    ALLEGRO_BITMAP* img_bt_sair = al_load_bitmap("sprites/sair.png");
+
+    int bt_width = 200;
+    int bt_height = 40;
+    int bt_x = (LARGURA_TELA - bt_width) / 2;
+    int bt_jogar_y = 260;
+    int bt_config_y = 320;
+    int bt_creditos_y = 380;
+    int bt_sair_y = 440;
+
     float scroll_x = 0.0;
     float velocidade_mar = 2.5;
 
@@ -176,6 +195,23 @@ int main() {
 
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             rodando = false;
+        }
+
+        // Clique do mouse na Tela Inicial (Menu)
+        if (game_state == 0 && event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+            int mouse_x = event.mouse.x;
+            int mouse_y = event.mouse.y;
+
+            if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                mouse_y >= bt_jogar_y && mouse_y <= bt_jogar_y + bt_height) {
+                al_flush_event_queue(event_queue);
+                iniciar_novo_jogo(&player, entidades, &fase_atual, &total_ativos, &tempo_restante, &velocidade_mar, fase_timer);
+                game_state = 1;
+            }
+            else if (mouse_x >= bt_x && mouse_x <= bt_x + bt_width &&
+                mouse_y >= bt_sair_y && mouse_y <= bt_sair_y + bt_height) {
+                rodando = false;
+            }
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
@@ -318,10 +354,23 @@ int main() {
             }
 
             if (game_state == 0) {
-                al_draw_text(font, al_map_rgb(255, 215, 0), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
-                al_draw_text(font, al_map_rgb(220, 220, 220), LARGURA_TELA / 2, 255, ALLEGRO_ALIGN_CENTER, "Atravesse os 5 mares mitologicos para voltar a Itaca!");
-                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 285, ALLEGRO_ALIGN_CENTER, "Use WASD ou Setas para navegar e responda aos deuses se colidir.");
-                al_draw_text(font, al_map_rgb(100, 255, 100), LARGURA_TELA / 2, 345, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Zarpar");
+                if (img_fundo) {
+                    al_draw_scaled_bitmap(img_fundo, 0, 0, al_get_bitmap_width(img_fundo), al_get_bitmap_height(img_fundo), 0, 0, LARGURA_TELA, ALTURA_TELA, 0);
+                }
+                else {
+                    al_clear_to_color(al_map_rgb(20, 25, 35));
+                }
+
+                if (img_titulo) {
+                    float t_w = al_get_bitmap_width(img_titulo);
+                    float t_h = al_get_bitmap_height(img_titulo);
+                    al_draw_scaled_bitmap(img_titulo, 0, 0, t_w, t_h, (LARGURA_TELA - 400) / 2, 60, 400, t_h * (400 / t_w), 0);
+                }
+
+                if (img_bt_jogar) al_draw_scaled_bitmap(img_bt_jogar, 0, 0, al_get_bitmap_width(img_bt_jogar), al_get_bitmap_height(img_bt_jogar), bt_x, bt_jogar_y, bt_width, bt_height, 0);
+                if (img_bt_config) al_draw_scaled_bitmap(img_bt_config, 0, 0, al_get_bitmap_width(img_bt_config), al_get_bitmap_height(img_bt_config), bt_x, bt_config_y, bt_width, bt_height, 0);
+                if (img_bt_creditos) al_draw_scaled_bitmap(img_bt_creditos, 0, 0, al_get_bitmap_width(img_bt_creditos), al_get_bitmap_height(img_bt_creditos), bt_x, bt_creditos_y, bt_width, bt_height, 0);
+                if (img_bt_sair) al_draw_scaled_bitmap(img_bt_sair, 0, 0, al_get_bitmap_width(img_bt_sair), al_get_bitmap_height(img_bt_sair), bt_x, bt_sair_y, bt_width, bt_height, 0);
             }
             else if (game_state == 1) {
                 draw_player(player);
@@ -387,6 +436,12 @@ int main() {
     al_destroy_timer(fase_timer);
     destroy_player(&player);
     destruir_sprites_inimigos();
+    if (img_fundo) al_destroy_bitmap(img_fundo);
+    if (img_titulo) al_destroy_bitmap(img_titulo);
+    if (img_bt_jogar) al_destroy_bitmap(img_bt_jogar);
+    if (img_bt_config) al_destroy_bitmap(img_bt_config);
+    if (img_bt_creditos) al_destroy_bitmap(img_bt_creditos);
+    if (img_bt_sair) al_destroy_bitmap(img_bt_sair);
     if (bg_mar) al_destroy_bitmap(bg_mar);
 
     return 0;
