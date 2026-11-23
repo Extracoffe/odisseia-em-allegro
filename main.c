@@ -4,6 +4,7 @@
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_image.h>
 #include <allegro5/allegro_ttf.h>
 #include "player.h"
 #include "enemy.h"
@@ -37,6 +38,7 @@ int main() {
     if (!al_init_font_addon()) return -1;
     if (!al_init_ttf_addon()) return -1;
     if (!al_init_primitives_addon()) return -1;
+    if (!al_init_image_addon()) return -1;
 
     srand((unsigned int)time(NULL));
 
@@ -67,7 +69,7 @@ int main() {
     int up = 0, down = 0, left = 0, right = 0;
     int tempo_restante = 15;
 
-    Player player;
+    Player player = { 0 };
     Enemy entidades[TOTAL_ENTIDADES];
 
     bool rodando = true;
@@ -188,6 +190,7 @@ int main() {
     al_destroy_event_queue(event_queue);
     al_destroy_timer(timer);
     al_destroy_timer(fase_timer);
+    destroy_player(&player);
 
     return 0;
 }

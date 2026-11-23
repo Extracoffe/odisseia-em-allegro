@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <allegro5/allegro_primitives.h>
 #include "player.h"
 
@@ -6,6 +7,13 @@ void init_player(Player* p) {
     p->y = 300.0;
     p->size = 40.0;
     p->speed = 6.0;
+
+    if (p->sprite == NULL) {
+        p->sprite = al_load_bitmap("sprites/barco.png");
+        if (!p->sprite) {
+            printf(stderr, "Erro ao carregar a imagem do jogador!\n");
+        }
+    }
 }
 
 void update_player(Player* p, int up, int down, int left, int right) {
@@ -23,6 +31,35 @@ void update_player(Player* p, int up, int down, int left, int right) {
 }
 
 void draw_player(Player p) {
-    // Navio/Jogador desenhado em azul claro
-    al_draw_filled_rectangle(p.x, p.y, p.x + p.size, p.y + p.size, al_map_rgb(50, 150, 255));
+    if (p.sprite) {
+        float largura_visual = 110.0; // Barco mais comprido na horizontal
+        float altura_visual = 65.0;
+
+        // Centraliza o desenho do barco em cima da hitbox 40x40
+        float offset_x = (largura_visual - p.size) / 2.0;
+        float offset_y = (altura_visual - p.size) / 2.0;
+
+        al_draw_scaled_bitmap(
+            p.sprite,
+            0, 0,
+            al_get_bitmap_width(p.sprite),
+            al_get_bitmap_height(p.sprite),
+            p.x - offset_x,
+            p.y - offset_y,
+            largura_visual,
+            altura_visual,
+            0
+        );
+    }
+    else {
+        // Fallback: se não achar a imagem, desenha o quadrado azul original
+        al_draw_filled_rectangle(p.x, p.y, p.x + p.size, p.y + p.size, al_map_rgb(50, 150, 255));
+    }
+}
+
+void destroy_player(Player* p) {
+    if (p->sprite) {
+        al_destroy_bitmap(p->sprite);
+        p->sprite = NULL;
+    }
 }
