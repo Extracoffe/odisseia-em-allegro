@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
@@ -11,6 +12,30 @@
 
 #define TOTAL_FASES 5
 #define MAX_ENTIDADES 20 // Capacidade máxima (até 10 obstáculos + 10 monstros)
+#define MAX_PROJETEIS 20
+
+typedef struct {
+    float x, y;
+    float vx, vy;
+    bool ativo;
+} ProjetilBoss;
+
+// Variáveis da Boss Fight
+float boss_y = 650.0;          // Poseidon começa escondido abaixo da tela
+float boss_tempo = 0.0;        // Timer interno da luta (em segundos)
+ProjetilBoss projeteis[MAX_PROJETEIS];
+float delay_tiro = 0.0;        // Controle de cadência dos ataques de Poseidon
+
+// Parâmetros do Ataque Supremo
+int supremo_zona_segura = 0;   // 0 = topo seguro, 1 = baixo seguro
+float supremo_aviso_tempo = 0.0; // Timer para o sinal de alerta vermelho
+bool supremo_disparado = false;
+
+// Sprites do Boss
+ALLEGRO_BITMAP* img_poseidon = NULL;
+ALLEGRO_BITMAP* img_tridente = NULL;
+ALLEGRO_BITMAP* img_alerta = NULL;
+
 
 typedef struct {
     const char* pergunta;
@@ -135,6 +160,31 @@ void alternar_tela_cheia(ALLEGRO_DISPLAY* display, bool* tela_cheia, float* esca
     *escala_y = (float)h_atual / 600.0f;
 }
 
+void disparar_tridente(float x, float y, float vx, float vy) {
+    for (int i = 0; i < MAX_PROJETEIS; i++) {
+        if (!projeteis[i].ativo) {
+            projeteis[i].x = x;
+            projeteis[i].y = y;
+            projeteis[i].vx = vx;
+            projeteis[i].vy = vy;
+            projeteis[i].ativo = true;
+            break;
+        }
+    }
+}
+
+// Reseta o estado da luta ao iniciar a Fase 5
+void iniciar_boss_fight() {
+    boss_y = 650.0; // Força ele a subir das profundezas
+    boss_tempo = 0.0;
+    delay_tiro = 0.0;
+    supremo_aviso_tempo = 0.0;
+    supremo_disparado = false;
+    for (int i = 0; i < MAX_PROJETEIS; i++) {
+        projeteis[i].ativo = false;
+    }
+}
+
 int main() {
     if (!al_init()) return -1;
     if (!al_install_keyboard()) return -1;
@@ -146,6 +196,9 @@ int main() {
 
     al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
     carregar_sprites_inimigos();
+    img_poseidon = al_load_bitmap("sprites/poseidon.png");
+    img_tridente = al_load_bitmap("sprites/tridente.png");
+    img_alerta = al_load_bitmap("sprites/alerta.png");
 
     srand((unsigned int)time(NULL));
 
@@ -274,7 +327,7 @@ int main() {
                     game_state = 1;
                 }
             }
-            else if (game_state == 1) {
+            else if (game_state == 1 || game_state == 6) {
                 switch (event.keyboard.keycode) {
                 case ALLEGRO_KEY_W:
                 case ALLEGRO_KEY_UP:
@@ -310,9 +363,12 @@ int main() {
                     if (escolha == banco_quiz[quiz_atual].resposta_correta) {
                         if (inimigo_colidido != -1) {
                             entidades[inimigo_colidido].x = 950.0;
+                            al_start_timer(fase_timer);
+                            game_state = 1;
                         }
-                        al_start_timer(fase_timer);
-                        game_state = 1;
+                        else {
+                            game_state = 6; // Volta para a Boss Fight!
+                        }
                     }
                     else {
                         game_state = 3;
@@ -326,6 +382,7 @@ int main() {
                     game_state = 1;
                 }
             }
+
         }
 
         if (event.type == ALLEGRO_EVENT_KEY_UP) {
@@ -352,24 +409,32 @@ int main() {
                 if (tempo_restante <= 0) {
                     al_stop_timer(fase_timer);
                     up = down = left = right = 0;
-                    if (fase_atual < TOTAL_FASES) {
-                        game_state = 5;
+
+                    if (fase_atual == 5) {
+                        iniciar_boss_fight();
+                        game_state = 6; // Entra na Boss Fight!
+                    }
+                    else if (fase_atual < TOTAL_FASES) {
+                        game_state = 5; // Vai para a transição normal das outras fases
                     }
                     else {
-                        game_state = 2;
+                        game_state = 2; // Vitória final
                     }
                 }
             }
         }
 
         // Atualização da lógica a 60 FPS (sem desenhar ainda!)
+        // Atualização da lógica a 60 FPS (sem desenhar ainda!)
         if (event.type == ALLEGRO_EVENT_TIMER && event.timer.source == timer) {
-            if (game_state == 1) {
-                scroll_x -= velocidade_mar;
+            if (game_state == 1 || game_state == 6) {
+                scroll_x -= (game_state == 6) ? 5.5 : velocidade_mar; // Mar mais agitado no boss
                 if (scroll_x <= -LARGURA_TELA) {
                     scroll_x = 0.0;
                 }
+            }
 
+            if (game_state == 1) {
                 update_player(&player, up, down, left, right);
 
                 for (int i = 0; i < total_ativos; i++) {
@@ -386,6 +451,82 @@ int main() {
                         up = down = left = right = 0;
                         game_state = 4;
                         break;
+                    }
+                }
+            }
+            else if (game_state == 6) {
+                // BOSS FIGHT LOGIC (60 FPS)
+                boss_tempo += 1.0 / 60.0;
+                update_player(&player, up, down, left, right);
+
+                // ATO 1: Poseidon Subindo (0.0s a 2.5s)
+                if (boss_tempo < 2.5) {
+                    if (boss_y > 220.0) boss_y -= 3.0;
+                }
+                // ATO 2 & 3: Luta Ativa
+                else {
+                    boss_y = 220.0 + sin(boss_tempo * 2.0) * 15.0;
+                    delay_tiro += 1.0 / 60.0;
+
+                    if (boss_tempo < 20.0) {
+                        if (delay_tiro >= 1.5) {
+                            delay_tiro = 0.0;
+                            if (rand() % 2 == 0) {
+                                float dy = (player.y - boss_y) / 50.0;
+                                disparar_tridente(620.0, boss_y + 80.0, -7.5, dy);
+                            }
+                            else {
+                                disparar_tridente(620.0, boss_y + 80.0, -6.5, -1.8);
+                                disparar_tridente(620.0, boss_y + 80.0, -7.0, 0);
+                                disparar_tridente(620.0, boss_y + 80.0, -6.5, 1.8);
+                            }
+                        }
+                    }
+                    else if (boss_tempo >= 20.0 && boss_tempo < 25.0) {
+                        if (supremo_aviso_tempo == 0.0) {
+                            supremo_zona_segura = rand() % 2;
+                            supremo_aviso_tempo = 1.0;
+                        }
+                    }
+                    else if (boss_tempo >= 25.0 && !supremo_disparado) {
+                        supremo_disparado = true;
+                    }
+                    else if (boss_tempo >= 29.0) {
+                        game_state = 2; // Vitória Final!
+                    }
+                }
+
+                // Atualizar e testar colisão dos tridentes
+                for (int i = 0; i < MAX_PROJETEIS; i++) {
+                    if (projeteis[i].ativo) {
+                        projeteis[i].x += projeteis[i].vx;
+                        projeteis[i].y += projeteis[i].vy;
+
+                        if (projeteis[i].x < -50) projeteis[i].ativo = false;
+
+                        if (projeteis[i].x < player.x + player.size &&
+                            projeteis[i].x + 35.0 > player.x &&
+                            projeteis[i].y < player.y + player.size &&
+                            projeteis[i].y + 15.0 > player.y) {
+
+                            projeteis[i].ativo = false;
+                            inimigo_colidido = -1;
+                            if (indice_fila_quiz >= TOTAL_QUIZ) embaralhar_quiz();
+                            quiz_atual = ordem_quiz[indice_fila_quiz++];
+                            up = down = left = right = 0;
+                            game_state = 4;
+                        }
+                    }
+                }
+
+                // Colisão do Ataque Supremo (Tsunami)
+                if (supremo_disparado && boss_tempo < 28.0) {
+                    bool em_zona_segura = false;
+                    if (supremo_zona_segura == 0 && player.y < 160) em_zona_segura = true;
+                    if (supremo_zona_segura == 1 && player.y > 380) em_zona_segura = true;
+
+                    if (!em_zona_segura) {
+                        game_state = 3; // Game Over
                     }
                 }
             }
@@ -479,6 +620,80 @@ int main() {
                 al_draw_textf(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 305, ALLEGRO_ALIGN_CENTER, "Novo tempo de travessia: %d segundos", 10 + ((fase_atual + 1) * 5));
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 360, ALLEGRO_ALIGN_CENTER, "Pressione ESPACO ou ENTER para Continuar");
             }
+            else if (game_state == 6) {
+                draw_player(player);
+
+                // Desenhar projéteis de tridente ativos
+                for (int i = 0; i < MAX_PROJETEIS; i++) {
+                    if (projeteis[i].ativo && img_tridente) {
+                        al_draw_scaled_bitmap(
+                            img_tridente,
+                            0, 0, al_get_bitmap_width(img_tridente), al_get_bitmap_height(img_tridente),
+                            projeteis[i].x, projeteis[i].y,
+                            60, 24, 0
+                        );
+                    }
+                }
+
+                // Desenhar Poseidon
+                if (img_poseidon) {
+                    float tremor_x = (boss_tempo < 2.5) ? (sin(boss_tempo * 80.0) * 3.0) : 0;
+                    al_draw_scaled_bitmap(
+                        img_poseidon,
+                        0, 0, al_get_bitmap_width(img_poseidon), al_get_bitmap_height(img_poseidon),
+                        600 + tremor_x, boss_y,
+                        220, 220, 0
+                    );
+                }
+
+                // ATO 1: Alerta de perigo
+                if (boss_tempo < 2.5) {
+                    if (((int)(boss_tempo * 8) % 2 == 0) && img_alerta) {
+                        al_draw_scaled_bitmap(
+                            img_alerta,
+                            0, 0, al_get_bitmap_width(img_alerta), al_get_bitmap_height(img_alerta),
+                            650, 100,
+                            80, 80, 0
+                        );
+                    }
+                    al_draw_text(font, al_map_rgb(255, 60, 60), LARGURA_TELA / 2, 80, ALLEGRO_ALIGN_CENTER, "ALGO ESTA SUBINDO DAS PROFUNDEZAS...");
+                }
+
+                // ATO 2 & 3: Barra de fúria e Supremo
+                if (boss_tempo >= 2.5) {
+                    float progresso = (29.0 - boss_tempo) / 26.5;
+                    if (progresso < 0) progresso = 0;
+
+                    al_draw_filled_rectangle(200, 25, 600, 40, al_map_rgb(40, 10, 10));
+                    al_draw_filled_rectangle(200, 25, 200 + (400 * progresso), 40, al_map_rgb(255, 60, 60));
+                    al_draw_rectangle(200, 25, 600, 40, al_map_rgb(255, 215, 0), 2.0);
+                    al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 10, ALLEGRO_ALIGN_CENTER, "SOBREVIVA A FURIA DE POSEIDON!");
+
+                    if (boss_tempo >= 20.0 && boss_tempo < 25.0) {
+                        if ((int)(boss_tempo * 5) % 2 == 0) {
+                            if (supremo_zona_segura == 0) {
+                                al_draw_filled_rectangle(0, 160, 800, 600, al_map_rgba(255, 0, 0, 80));
+                                al_draw_text(font, al_map_rgb(255, 100, 100), LARGURA_TELA / 2, 350, ALLEGRO_ALIGN_CENTER, "!!! CORRA PARA O TOPO DO MAPA !!!");
+                            }
+                            else {
+                                al_draw_filled_rectangle(0, 0, 800, 440, al_map_rgba(255, 0, 0, 80));
+                                al_draw_text(font, al_map_rgb(255, 100, 100), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "!!! CORRA PARA A BASE DO MAPA !!!");
+                            }
+                        }
+                    }
+
+                    if (supremo_disparado && boss_tempo < 28.0) {
+                        if (supremo_zona_segura == 0) {
+                            al_draw_filled_rectangle(0, 160, 800, 600, al_map_rgba(0, 80, 180, 200));
+                            al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 350, ALLEGRO_ALIGN_CENTER, "TSUNAMI DIVINO!");
+                        }
+                        else {
+                            al_draw_filled_rectangle(0, 0, 800, 440, al_map_rgba(0, 80, 180, 200));
+                            al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "TSUNAMI DIVINO!");
+                        }
+                    }
+                }
+            }
             else if (game_state == 7) {
                 // Fundo do menu escurecido
                 if (img_fundo) {
@@ -556,6 +771,9 @@ int main() {
     if (img_bt_creditos) al_destroy_bitmap(img_bt_creditos);
     if (img_bt_sair) al_destroy_bitmap(img_bt_sair);
     if (bg_mar) al_destroy_bitmap(bg_mar);
+    if (img_poseidon) al_destroy_bitmap(img_poseidon);
+    if (img_tridente) al_destroy_bitmap(img_tridente);
+    if (img_alerta) al_destroy_bitmap(img_alerta);
 
     return 0;
 }
