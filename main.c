@@ -7,6 +7,8 @@
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_ttf.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 #include "player.h"
 #include "enemy.h"
 
@@ -193,6 +195,9 @@ int main() {
     if (!al_init_ttf_addon()) return -1;
     if (!al_init_primitives_addon()) return -1;
     if (!al_init_image_addon()) return -1;
+    if (!al_install_audio()) return -1;
+    if (!al_init_acodec_addon()) return -1;
+    if (!al_reserve_samples(8)) return -1; // Reserva canais simultâneos de áudio
 
     al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
     carregar_sprites_inimigos();
@@ -264,6 +269,13 @@ int main() {
 
     bool rodando = true;
     bool redesenhar = false;
+
+    ALLEGRO_AUDIO_STREAM* musica_fundo = al_load_audio_stream("audio/odisseia.wav", 4, 2048);
+    if (musica_fundo) {
+        al_set_audio_stream_playmode(musica_fundo, ALLEGRO_PLAYMODE_LOOP);
+        al_set_audio_stream_gain(musica_fundo, 0.6f); // Volume (0.0 a 1.0)
+        al_attach_audio_stream_to_mixer(musica_fundo, al_get_default_mixer());
+    }
 
     while (rodando) {
         ALLEGRO_EVENT event;
@@ -774,6 +786,10 @@ int main() {
     if (img_poseidon) al_destroy_bitmap(img_poseidon);
     if (img_tridente) al_destroy_bitmap(img_tridente);
     if (img_alerta) al_destroy_bitmap(img_alerta);
+    if (musica_fundo) {
+        al_drain_audio_stream(musica_fundo);
+        al_destroy_audio_stream(musica_fundo);
+    }
 
     return 0;
 }
