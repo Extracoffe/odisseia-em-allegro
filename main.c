@@ -743,7 +743,7 @@ int main() {
                 al_draw_text(font, al_map_rgb(100, 255, 150), LARGURA_TELA / 2, 200, ALLEGRO_ALIGN_CENTER, "A ODISSEIA: SOBREVIVENCIA");
 
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 245, ALLEGRO_ALIGN_CENTER, "Desenvolvimento & Programacao:");
-                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 265, ALLEGRO_ALIGN_CENTER, "Andre Rodarte, Kaua Vicentini e Pedro Tutsumi");
+                al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 265, ALLEGRO_ALIGN_CENTER, "Andre Rodarte, Kaua Vicentini e Pedro Tsutumi");
 
                 al_draw_text(font, al_map_rgb(255, 255, 255), LARGURA_TELA / 2, 305, ALLEGRO_ALIGN_CENTER, "Tecnologias:");
                 al_draw_text(font, al_map_rgb(200, 200, 200), LARGURA_TELA / 2, 325, ALLEGRO_ALIGN_CENTER, "Linguagem C & Biblioteca Allegro 5");
